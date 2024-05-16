@@ -225,7 +225,7 @@ def main():
                 print("Please provide an input CSV file for the ETL pipeline.")
                 return
             
-            pipeline = ETLPipeline(args.input, "udbmappings.json")
+            pipeline = ETLPipeline(args.input, "conf/udbmappings.json")
             pipeline.load_data()
 
             initial_count = pipeline.load_data()

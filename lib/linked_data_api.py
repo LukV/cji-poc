@@ -1,7 +1,7 @@
 # lib/linked_data_api.py
 from authlib.integrations.httpx_client import OAuth2Client
 from pandas import DataFrame
-import config
+import conf.config as config
 
 class LinkedDataAPI:
     def __init__(self):

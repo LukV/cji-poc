@@ -200,7 +200,7 @@ class ETLPipeline:
 
     def remove(self):
         # Open the file and read the lines
-        with open('to_remove.txt', 'r') as file:
+        with open('conf/to_remove.txt', 'r') as file:
             to_remove = file.readlines()
 
         # Remove newline characters and create an array
