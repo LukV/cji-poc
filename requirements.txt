@@ -3,8 +3,5 @@ pandas
 httpx
 authlib
 python-dotenv
-pyproj
-lxml
-fuzzywuzzy
 python-Levenshtein
 rapidfuzz

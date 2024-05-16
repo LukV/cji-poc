@@ -1,10 +1,29 @@
-# main.py
+"""
+Main module for handling data fetching, merging, and ETL pipeline execution.
+
+This module provides command-line interfaces for:
+- Fetching data from specified endpoints.
+- Merging CSV files.
+- Running an ETL pipeline to cleanse and process data.
+"""
+
+import argparse
 from lib.linked_data_api import LinkedDataAPI
 from lib.data_cruncher import DataCruncher
 from lib.etl_pipeline import ETLPipeline
-import argparse
+
 
 def head(limit: int = 5):
+    """
+    Generates a SPARQL query to retrieve a limited number of data entries.
+
+    Args:
+        limit (int): Number of entries to retrieve. Default is 5.
+
+    Returns:
+        str: SPARQL query string.
+    """
+
     return f"""
             SELECT * 
             WHERE {{
@@ -18,6 +37,13 @@ def head(limit: int = 5):
         """
 
 def count():
+    """
+    Generates a SPARQL query to count the distinct subjects in the dataset.
+
+    Returns:
+        str: SPARQL query string.
+    """
+
     return """
             SELECT (COUNT(DISTINCT ?s) AS ?subjectCount)
             WHERE {
@@ -49,14 +75,36 @@ def count():
         """
 
 endpoints = {
-        "publiq": "https://data.uitwisselingsplatform.be/be.publiq.vrijetijdsparticipatie/publiq-uit-locaties/placessparql",
-        "jeugdmaps": "https://data.uitwisselingsplatform.be/be.dcjm.infrastructuur/jeugdmaps-infrastructuur/jeugdmapsinfra",
-        "kiosk": "https://data.uitwisselingsplatform.be/be.dcjm.infrastructuur/kiosk-infrastructuur/infrastructuur",
-        "kampas": "https://data.uitwisselingsplatform.be/be.dcjm.infrastructuur/kampas-infrastructuur/kampasinfrastructuur",
-        "anb": "https://data.uitwisselingsplatform.be/be.dcjm.infrastructuur/anb-speelzones-infrastructuur/anbterreinen",
-        "erfgoed": "https://data.uitwisselingsplatform.be/be.dcjm.infrastructuur/erfgoedkaart-infrastructuur/infrastructuurerfgoed",
-        "terra": "https://data.uitwisselingsplatform.be/be.dcjm.infrastructuur/terra-infrastructuur/terrainfra"
-    }
+    "publiq": (
+        "https://data.uitwisselingsplatform.be/"
+        "be.publiq.vrijetijdsparticipatie/publiq-uit-locaties/placessparql"
+    ),
+    "jeugdmaps": (
+        "https://data.uitwisselingsplatform.be/"
+        "be.dcjm.infrastructuur/jeugdmaps-infrastructuur/jeugdmapsinfra"
+    ),
+    "kiosk": (
+        "https://data.uitwisselingsplatform.be/"
+        "be.dcjm.infrastructuur/kiosk-infrastructuur/infrastructuur"
+    ),
+    "kampas": (
+        "https://data.uitwisselingsplatform.be/"
+        "be.dcjm.infrastructuur/kampas-infrastructuur/kampasinfrastructuur"
+    ),
+    "anb": (
+        "https://data.uitwisselingsplatform.be/"
+        "be.dcjm.infrastructuur/anb-speelzones-infrastructuur/anbterreinen"
+    ),
+    "erfgoed": (
+        "https://data.uitwisselingsplatform.be/"
+        "be.dcjm.infrastructuur/erfgoedkaart-infrastructuur/infrastructuurerfgoed"
+    ),
+    "terra": (
+        "https://data.uitwisselingsplatform.be/"
+        "be.dcjm.infrastructuur/terra-infrastructuur/terrainfra"
+    )
+}
+
 
 queries = {
     "head": head,
@@ -209,66 +257,73 @@ queries = {
 }
 
 def main():
-        parser = argparse.ArgumentParser()
-        parser.add_argument('-p', '--product', help='the data product to fetch.')
-        parser.add_argument('-f', '--file', help='the file to write the data to.')
-        parser.add_argument('-m', '--merge', nargs='+', help='the CSV files to merge.')
-        parser.add_argument('--etl', help='CJI specifc ETL pipeline to cleanse the data.')
-        parser.add_argument('-i', '--input', help='Input CSV file for the ETL pipeline.')
+    """
+    Main function to handle command-line arguments and execute the required tasks.
+    """
 
-        args = parser.parse_args()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-p', '--product', help='the data product to fetch.')
+    parser.add_argument('-f', '--file', help='the file to write the data to.')
+    parser.add_argument('-m', '--merge', nargs='+', help='the CSV files to merge.')
+    parser.add_argument('--etl', help='CJI specifc ETL pipeline to cleanse the data.')
+    parser.add_argument('-i', '--input', help='Input CSV file for the ETL pipeline.')
 
-        if args.etl:
-            print("Running ETL pipeline")
-            
-            if not args.input:
-                print("Please provide an input CSV file for the ETL pipeline.")
-                return
-            
-            pipeline = ETLPipeline(args.input, "conf/udbmappings.json")
-            pipeline.load_data()
+    args = parser.parse_args()
 
-            initial_count = pipeline.load_data()
-            print(f"Initial number of records: {initial_count}")
+    if args.etl:
+        print("Running ETL pipeline")
 
-            filtered_count = pipeline.filter_udb_location_type()
-            print(f"Number of records after filter by UDB type: {filtered_count}")
-
-            grouped_count = pipeline.group_by_id()
-            print(f"Number of records after grouping by ID: {grouped_count}")
-
-            pipeline.advanced_cleanup_strings()
-            pipeline.fill_empty_location_type()
-
-            quarantine_count = pipeline.remove()
-            print(f"Number of records after removing quarantined records (see to_remove.txt): {quarantine_count}")
-
-            deduplicated_count = pipeline.deduplicate_data()
-            print("Number of rows per certainty ratio:")
-            print(deduplicated_count)
-
-            pipeline.save_data()
+        if not args.input:
+            print("Please provide an input CSV file for the ETL pipeline.")
             return
 
-        if args.merge:
-            print("Merging files: ", args.merge)
-            DataCruncher.merge(args.merge)
-            return
+        pipeline = ETLPipeline(args.input, "conf/udbmappings.json")
+        pipeline.load_data()
 
-        if not args.product:
-            print("Please provide a data product to fetch: publiq, jeugdmaps, kiosk, erfgoed, kampas, anb")
-            return
+        initial_count = pipeline.load_data()
+        print(f"Initial number of records: {initial_count}")
 
-        api = LinkedDataAPI()
-        api.set_data_endpoint(endpoints[args.product])
-        api.set_query(queries[args.product])
-        df = api.fetch_data()
+        filtered_count = pipeline.filter_udb_location_type()
+        print(f"Number of records after filter by UDB type: {filtered_count}")
 
-        # If a filename is provided as a command line argument, write the data to a CSV file
-        if args.file:
-            df.to_csv(args.file, index=False)
+        grouped_count = pipeline.group_by_id()
+        print(f"Number of records after grouping by ID: {grouped_count}")
 
-        print(df)
+        pipeline.advanced_cleanup_strings()
+        pipeline.fill_empty_location_type()
+
+        quarantine_count = pipeline.remove()
+        print(f"Number of records after removing \
+            quarantined records (see to_remove.txt): {quarantine_count}")
+
+        deduplicated_count = pipeline.deduplicate_data()
+        print("Number of rows per certainty ratio:")
+        print(deduplicated_count)
+
+        pipeline.save_data()
+        return
+
+    if args.merge:
+        print("Merging files: ", args.merge)
+        DataCruncher.merge(args.merge)
+        return
+
+    if not args.product:
+        print("Please provide a data product to fetch: publiq, \
+              jeugdmaps, kiosk, erfgoed, kampas, anb")
+        return
+
+    api = LinkedDataAPI()
+    api.set_data_endpoint(endpoints[args.product])
+    api.set_query(queries[args.product])
+    df = api.fetch_data()
+
+    # If a filename is provided as a command line argument,
+    # write the data to a CSV file
+    if args.file:
+        df.to_csv(args.file, index=False)
+
+    print(df)
 
 if __name__ == "__main__":
-        main()
+    main()

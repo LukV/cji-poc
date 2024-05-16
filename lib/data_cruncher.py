@@ -1,9 +1,19 @@
-# data_cruncher.py
+"""
+Utility module for merging multiple CSV files into one.
+"""
 import pandas as pd
 
 class DataCruncher:
+    """
+    DataCruncher is a class that provides a method to merge multiple CSV files into one.
+    """
+
     @staticmethod
-    def merge(csv_files):
+    def merge(csv_files: list):
+        """
+        Merge multiple CSV files into one.
+        :param csv_files: A list of CSV file paths.
+        """
         # Initialize an empty list to store the dataframes
         dataframes = []
 
@@ -17,3 +27,4 @@ class DataCruncher:
 
         # Save the merged dataframe to a new CSV file
         merged_df.to_csv('merged.csv', index=False)
+        
