@@ -1,5 +1,3 @@
-# requirements.txt
-pylint
 pandas
 httpx
 authlib
