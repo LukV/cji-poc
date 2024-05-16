@@ -8,6 +8,10 @@ class DataCruncher:
     DataCruncher is a class that provides a method to merge multiple CSV files into one.
     """
 
+    # pylint: disable=too-few-public-methods
+    def __init__(self):
+        pass
+
     @staticmethod
     def merge(csv_files: list):
         """
@@ -27,4 +31,3 @@ class DataCruncher:
 
         # Save the merged dataframe to a new CSV file
         merged_df.to_csv('merged.csv', index=False)
-        

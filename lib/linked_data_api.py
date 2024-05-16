@@ -1,7 +1,7 @@
 """This module provides a class to interact with the Linked Data API of UiTwisselingsplatform."""
 from authlib.integrations.httpx_client import OAuth2Client
 from pandas import DataFrame
-import conf.config as config
+from conf import config
 
 class LinkedDataAPI:
     """
@@ -28,11 +28,14 @@ class LinkedDataAPI:
 
     def fetch_data(self):
         """Fetch data from the Linked Data API."""
-        response = self.client.post(self.data_endpoint, data={'query': self.query}, timeout=None)
+        response = self.client.post(self.data_endpoint,
+                                    data={'query': self.query},
+                                    timeout=None)
+
         if response.status_code == 200:
             data = response.json()
             df = DataFrame(data['results']['bindings'])
             return df.map(lambda x: x['value'])
-        else:
-            print(f'Error: {response.status_code} - {response.text}')
-            return None
+
+        print(f'Error: {response.status_code} - {response.text}')
+        return None

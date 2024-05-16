@@ -120,76 +120,99 @@ class ETLPipeline:
         """Deduplicate the data based on specified rules."""
         df = self.data
 
-        # Define the subset of fields to check for duplicates
+        # Step 1: Prepare data for deduplication
+        df = self._prepare_data_for_deduplication(df)
+
+        # Step 2: Initial deduplication
+        df = self._initial_deduplication(df)
+
+        # Step 3: Additional deduplication
+        df = self._additional_deduplication(df)
+
+        # Step 4: Fuzzy matching on location names
+        df = self._fuzzy_matching(df)
+
+        # Step 5: Final adjustments
+        df = self._final_adjustments(df)
+
+        self.data = df
+
+        # Return the number of rows per certainty_ratio value
+        return df['certainty_ratio'].value_counts().sort_index()
+
+    def _prepare_data_for_deduplication(self, df):
+        """Prepare data by converting subset fields to the correct casing."""
         subset_fields = ['locationName', 'locationType',
                          'thoroughfare', 'huisnummer', 'postCode', 'city']
 
-        # Convert the subset fields to correct casing
         df['locationName_tmp'] = df['locationName']
-        for field in subset_fields:
-            df[field] = df[field].str.title() if field in ['locationName',
-                                                           'thoroughfare', 'city'] else df[field]
 
-        # Find duplicates based on the subset of fields
+        for field in subset_fields:
+            if field in ['locationName', 'thoroughfare', 'city']:
+                df[field] = df[field].str.title()
+
+        return df
+
+    def _initial_deduplication(self, df):
+        """Perform initial deduplication based on subset fields."""
+        subset_fields = ['locationName', 'locationType', 'thoroughfare',
+                         'huisnummer', 'postCode', 'city']
+
         duplicates = df.duplicated(subset=subset_fields, keep=False)
 
-        # Calculate the ratio of certainty
-        # If all fields match exactly, the ratio is 1 (100%)
-        df['certainty_ratio'] = duplicates \
-            .groupby(df[subset_fields].apply(tuple, axis=1)).transform('mean')
+        df['certainty_ratio'] = duplicates.groupby(df[subset_fields]. \
+            apply(tuple, axis=1)).transform('mean')
 
-        # Add a column to indicate if the row is a duplicate or not
         df['is_duplicate'] = duplicates
 
-        # Add the subject value of the first duplicate to the other duplicate rows
-        df['duplicate_subject'] = df.loc[duplicates, 'subject'] \
-            .groupby(df[subset_fields].apply(tuple, axis=1)).transform('first')
+        df['duplicate_subject'] = df.loc[duplicates, 'subject']. \
+            groupby(df[subset_fields].apply(tuple, axis=1)).transform('first')
 
-        # Define subsets for additional deduplication
+        return df
+
+    def _additional_deduplication(self, df):
+        """Perform additional deduplication with different subsets."""
         additional_subsets = [
             (['locationName', 'locationType', 'postCode'], 0.6),
             (['thoroughfare', 'huisnummer', 'postCode', 'city'], 0.4)
         ]
 
         for subset, certainty in additional_subsets:
-            # Identify duplicates in the rows where is_duplicate is False
             condition = df['is_duplicate'] is False
             new_duplicates = df.loc[condition].duplicated(subset=subset, keep=False)
-
-            # Update the certainty ratio and is_duplicate
-            df.loc[condition, 'certainty_ratio'] = df. \
-                loc[condition & new_duplicates, subset] \
-                    .apply(tuple, axis=1).map(
-                        df.loc[condition & new_duplicates, subset]. \
-                            apply(tuple, axis=1).value_counts(normalize=True)
-                            ).fillna(0.0)
+            df.loc[condition, 'certainty_ratio'] = df.loc[condition & new_duplicates, subset] \
+                .apply(tuple, axis=1).map(
+                df.loc[condition & new_duplicates, subset] \
+                    .apply(tuple, axis=1).value_counts(normalize=True)).fillna(0.0)
 
             df.loc[condition & new_duplicates, 'certainty_ratio'] = certainty
             df.loc[condition & new_duplicates, 'is_duplicate'] = True
 
-            # Update the duplicate_subject
             duplicate_subjects = df.loc[condition & new_duplicates, 'subject'].groupby(
-                df.loc[condition & new_duplicates, subset].apply(tuple, axis=1)
-            ).transform('first')
+                df.loc[condition & new_duplicates, subset].apply(tuple, axis=1)).transform('first')
+
             df.loc[condition & new_duplicates, 'duplicate_subject'] = duplicate_subjects
 
-        # Handling location names with fuzzy matching
+        return df
+
+    def _fuzzy_matching(self, df):
+        """Perform fuzzy matching on location names."""
         condition = df['certainty_ratio'] == 0.4
         unmatched_df = df[condition]
         all_names = unmatched_df['locationName'].dropna().unique().tolist()
-
         matched_pairs = []
+
         for name in all_names:
-            matches = process. \
-                extract(name, all_names, scorer=fuzz.token_sort_ratio, limit=len(all_names))
+            matches = process.extract(name,
+                                      all_names,
+                                      scorer=fuzz.token_sort_ratio,
+                                      limit=len(all_names))
             for match in matches:
-                if match[1] >= 90 and name != match[0]:  # Threshold for fuzzy matching
+                if match[1] >= 90 and name != match[0]:
                     matched_pairs.append((name, match[0]))
 
         for original, match in matched_pairs:
             mask = (df['locationName'] == match) & condition
-
-            # Check if 'thoroughfare', 'huisnummer', 'postCode', and 'city' also match
             thoroughfare_match = df.loc[mask, 'thoroughfare'].values[0] == df. \
                 loc[df['locationName'] == original, 'thoroughfare'].values[0]
             postcode_match = df.loc[mask, 'postCode'].values[0] == df. \
@@ -200,27 +223,23 @@ class ETLPipeline:
                 first_subject = df.loc[df['locationName'] == original, 'subject'].iloc[0]
                 df.loc[mask, 'duplicate_subject'] = first_subject
 
-        # Remove values in duplicate_subject with NaN if they match the values
-        # in subject to indicate the original row
+        return df
+
+    def _final_adjustments(self, df):
+        """Make final adjustments to the dataframe."""
         df.loc[df['duplicate_subject'] == df['subject'], 'duplicate_subject'] = ""
-
-        # Decrease the certainty ratio for rows without postCode and city
         condition = (df['certainty_ratio'] == 1) & \
-            ((df['postCode'].isna() | df['postCode'].eq('')) | \
-             (df['city'].isna() | df['city'].eq('')))
-        df.loc[condition, 'certainty_ratio'] = 0.1
+            ((df['postCode'].isna() | \
+                df['postCode'].eq('')) | \
+                    (df['city'].isna() | df['city'].eq('')))
 
-        # Drop the temporary columns
+        df.loc[condition, 'certainty_ratio'] = 0.1
         df['locationName'] = df['locationName_tmp']
         df.drop(columns=['locationName_tmp'], inplace=True)
-
-        # Replace NaN values in certainty_ratio with the placeholder 0
         df['certainty_ratio'] = df['certainty_ratio'].fillna(0)
 
-        self.data = df
+        return df
 
-        # Return the number of rows per certainty_ratio value
-        return df['certainty_ratio'].value_counts().sort_index()
 
     def remove(self):
         """Remove rows that contain specific strings."""

@@ -1,7 +1,9 @@
 # requirements.txt
+pylint
 pandas
 httpx
 authlib
 python-dotenv
 python-Levenshtein
 rapidfuzz
+dotenv
