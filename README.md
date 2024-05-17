@@ -4,12 +4,13 @@ This project contains a Python-based ETL (Extract, Transform, Load) pipeline tha
 
 ## Features
 
-- Load data from a CSV file
-- Filter data based on UDB location type
-- Group data by ID
-- Perform advanced cleanup on strings
-- Fill empty location types
-- Remove quarantined records based on a list in `to_remove.txt`
-- Deduplicate data
-- Save processed data to a new CSV file
-- Merge multiple CSV files into one
+- Extract data from a triple store
+- _Aggregate_ - Merge multiple CSV files into one
+- _Consolidate_ Transform data:
+    - Filter data based on UDB location type
+    - Group data by ID
+    - Perform cleanup on strings
+    - Fill empty location types
+    - Remove quarantined records based on a list in `to_remove.txt`
+    - Deduplicate data
+- Load processed data to a CSV file

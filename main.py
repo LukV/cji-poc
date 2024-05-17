@@ -12,7 +12,6 @@ from lib.linked_data_api import LinkedDataAPI
 from lib.data_cruncher import DataCruncher
 from lib.etl_pipeline import ETLPipeline
 
-
 def head(limit: int = 5):
     """
     Generates a SPARQL query to retrieve a limited number of data entries.
