@@ -24,14 +24,14 @@ def head(limit: int = 5):
     """
 
     return f"""
-            SELECT * 
+            SELECT *
             WHERE {{
                 {{ GRAPH ?g {{ ?s ?p ?o }} }}
                 UNION
                 {{ ?s ?p ?o .
                     FILTER NOT EXISTS {{ GRAPH ?g {{ ?s ?p ?o }} }}
                 }}
-            }} 
+            }}
             LIMIT {limit}
         """
 
